@@ -7,7 +7,6 @@
     "module": "esnext",
     "moduleResolution": "node",
     "noEmit": true,
-    // "noLib": true,
     "pretty": true,
     "resolveJsonModule": true,
     "plugins": [

@@ -10,12 +10,13 @@
  */
 
 import { args } from "deno";
-import { uuidV4 } from "mod.ts";
+//@ts-ignore
+import { uuid } from "mod.ts";
 
 let n = args.length > 1 ? Number(args[1]) : 1;
 
 Array(n)
   .fill(0)
   .forEach(() => {
-    console.log(uuidV4());
+    console.log(uuid());
   });

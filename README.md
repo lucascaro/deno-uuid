@@ -40,9 +40,9 @@ $ genuuid
 For use in other packages, simply import the function:
 
 ```js
-import { uuidV4 } from " https://deno.land/x/uuid/mod.ts";
+import { uuid } from " https://deno.land/x/uuid/mod.ts";
 
-const myUUID = uuidV4();
+const myUUID = uuid();
 ```
 
 LICENSE: MIT
