@@ -1,11 +1,12 @@
 // Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
-import { assert, assertEqual, test } from "https://deno.land/x/testing/mod.ts";
+import { assert, assertEquals } from "https://deno.land/std/testing/asserts.ts";
+import { test } from "https://deno.land/std/testing/mod.ts";
 //@ts-ignore
 import { isValid, uuid } from "../../v4.ts";
 
 test(function test_uuid_v4() {
   const u = uuid();
-  assertEqual(typeof u, "string", "returns a string");
+  assertEquals(typeof u, "string", "returns a string");
   assert(u !== "", "return string is not empty");
 });
 

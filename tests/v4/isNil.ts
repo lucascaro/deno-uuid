@@ -1,5 +1,6 @@
 // Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
-import { assert, test } from "https://deno.land/x/testing/mod.ts";
+import { assert } from "https://deno.land/std/testing/asserts.ts";
+import { test } from "https://deno.land/std/testing/mod.ts";
 //@ts-ignore
 import { NIL_UUID } from "../../mod.ts";
 //@ts-ignore
