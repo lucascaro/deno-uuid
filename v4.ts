@@ -1,5 +1,5 @@
 //@ts-ignore
-import { NIL_UUID } from "mod.ts";
+import { NIL_UUID } from "./mod.ts";
 
 //format.ts
 /**

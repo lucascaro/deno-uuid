@@ -9,9 +9,9 @@
  * where N is an optional number of uuids to generate (defaults to 1).
  */
 
-import { args } from "deno";
-//@ts-ignore
-import { uuid } from "mod.ts";
+import { uuid } from "./mod.ts";
+
+const { args } = Deno;
 
 let n = args.length > 1 ? Number(args[1]) : 1;
 
