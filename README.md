@@ -40,7 +40,7 @@ $ genuuid
 For use in other packages, simply import the function:
 
 ```js
-import { uuid } from " https://deno.land/x/uuid/mod.ts";
+import { uuid } from "https://deno.land/x/uuid/mod.ts";
 
 const myUUID = uuid();
 ```
