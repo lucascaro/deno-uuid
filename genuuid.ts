@@ -13,7 +13,14 @@ import { uuid } from "./mod.ts";
 
 const { args } = Deno;
 
-let n = args.length > 1 ? Number(args[1]) : 1;
+const n = args.length > 1 ? Number(args[1]) : 1;
+
+if (Number.isNaN(n)) {
+  console.error(
+    `First argument needs to be a number. '${args.slice(1)}' given.`
+  );
+  Deno.exit(1);
+}
 
 Array(n)
   .fill(0)

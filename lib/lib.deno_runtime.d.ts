@@ -683,7 +683,8 @@ declare namespace Deno {
     InvalidUri = 37,
     InvalidSeekMode = 38,
     OpNotAvaiable = 39,
-    WorkerInitFailed = 40
+    WorkerInitFailed = 40,
+    UnixError = 41
   }
   /** A Deno specific error.  The `kind` property is set to a specific error code
    * which can be used to in application logic.
@@ -869,6 +870,11 @@ declare namespace Deno {
     stderr?: ProcessStdio;
     stdin?: ProcessStdio;
   }
+  /** Send a signal to process under given PID. Unix only at this moment.
+   * If pid is negative, the signal will be sent to the process group identified
+   * by -pid.
+   */
+  export function kill(pid: number, signo: number): void;
   export class Process {
     readonly rid: number;
     readonly pid: number;
@@ -887,6 +893,7 @@ declare namespace Deno {
      */
     stderrOutput(): Promise<Uint8Array>;
     close(): void;
+    kill(signo: number): void;
   }
   export interface ProcessStatus {
     success: boolean;
@@ -906,6 +913,76 @@ declare namespace Deno {
    * `opt.stdout`, `opt.stderr` and `opt.stdin` can be specified independently.
    */
   export function run(opt: RunOptions): Process;
+  enum LinuxSignal {
+    SIGHUP = 1,
+    SIGINT = 2,
+    SIGQUIT = 3,
+    SIGILL = 4,
+    SIGTRAP = 5,
+    SIGABRT = 6,
+    SIGBUS = 7,
+    SIGFPE = 8,
+    SIGKILL = 9,
+    SIGUSR1 = 10,
+    SIGSEGV = 11,
+    SIGUSR2 = 12,
+    SIGPIPE = 13,
+    SIGALRM = 14,
+    SIGTERM = 15,
+    SIGSTKFLT = 16,
+    SIGCHLD = 17,
+    SIGCONT = 18,
+    SIGSTOP = 19,
+    SIGTSTP = 20,
+    SIGTTIN = 21,
+    SIGTTOU = 22,
+    SIGURG = 23,
+    SIGXCPU = 24,
+    SIGXFSZ = 25,
+    SIGVTALRM = 26,
+    SIGPROF = 27,
+    SIGWINCH = 28,
+    SIGIO = 29,
+    SIGPWR = 30,
+    SIGSYS = 31
+  }
+  enum MacOSSignal {
+    SIGHUP = 1,
+    SIGINT = 2,
+    SIGQUIT = 3,
+    SIGILL = 4,
+    SIGTRAP = 5,
+    SIGABRT = 6,
+    SIGEMT = 7,
+    SIGFPE = 8,
+    SIGKILL = 9,
+    SIGBUS = 10,
+    SIGSEGV = 11,
+    SIGSYS = 12,
+    SIGPIPE = 13,
+    SIGALRM = 14,
+    SIGTERM = 15,
+    SIGURG = 16,
+    SIGSTOP = 17,
+    SIGTSTP = 18,
+    SIGCONT = 19,
+    SIGCHLD = 20,
+    SIGTTIN = 21,
+    SIGTTOU = 22,
+    SIGIO = 23,
+    SIGXCPU = 24,
+    SIGXFSZ = 25,
+    SIGVTALRM = 26,
+    SIGPROF = 27,
+    SIGWINCH = 28,
+    SIGINFO = 29,
+    SIGUSR1 = 30,
+    SIGUSR2 = 31
+  }
+  /** Signals numbers. This is platform dependent.
+   */
+  export const Signal: typeof MacOSSignal | typeof LinuxSignal;
+  export {};
   type ConsoleOptions = Partial<{
     showHidden: boolean;
     depth: number;
@@ -2115,6 +2192,8 @@ declare namespace urlSearchParams {
      *        searchParams.toString();
      */
     toString(): string;
+    private _handleStringInitialization;
+    private _handleArrayInitialization;
   }
 }
 
