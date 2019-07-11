@@ -36,6 +36,11 @@ declare namespace Deno {
     [index: string]: string;
   };
   /**
+   * Returns the current user's home directory.
+   * Does not require elevated privileges.
+   */
+  export function homeDir(): string;
+  /**
    * `cwd()` Return a string representing the current working directory.
    * If the current directory can be reached via multiple paths
    * (due to symbolic links), `cwd()` may return
@@ -48,10 +53,8 @@ declare namespace Deno {
    * throws `NotFound` exception if directory not available
    */
   export function chdir(directory: string): void;
-  export interface ReadResult {
-    nread: number;
-    eof: boolean;
-  }
+  export const EOF: null;
+  export type EOF = null;
   export enum SeekMode {
     SEEK_START = 0,
     SEEK_CURRENT = 1,
@@ -59,35 +62,26 @@ declare namespace Deno {
   }
   export interface Reader {
     /** Reads up to p.byteLength bytes into `p`. It resolves to the number
-     * of bytes read (`0` <= `n` <= `p.byteLength`) and any error encountered.
+     * of bytes read (`0` < `n` <= `p.byteLength`) and rejects if any error encountered.
      * Even if `read()` returns `n` < `p.byteLength`, it may use all of `p` as
      * scratch space during the call. If some data is available but not
      * `p.byteLength` bytes, `read()` conventionally returns what is available
      * instead of waiting for more.
      *
-     * When `read()` encounters an error or end-of-file condition after
-     * successfully reading `n` > `0` bytes, it returns the number of bytes read.
-     * It may return the (non-nil) error from the same call or return the error
-     * (and `n` == `0`) from a subsequent call. An instance of this general case
-     * is that a `Reader` returning a non-zero number of bytes at the end of the
-     * input stream may return either `err` == `EOF` or `err` == `null`. The next
-     * `read()` should return `0`, `EOF`.
+     * When `read()` encounters end-of-file condition, it returns EOF symbol.
+     *
+     * When `read()` encounters an error, it rejects with an error.
      *
      * Callers should always process the `n` > `0` bytes returned before
-     * considering the `EOF`. Doing so correctly handles I/O errors that happen
-     * after reading some bytes and also both of the allowed `EOF` behaviors.
-     *
-     * Implementations of `read()` are discouraged from returning a zero byte
-     * count with a `null` error, except when `p.byteLength` == `0`. Callers
-     * should treat a return of `0` and `null` as indicating that nothing
-     * happened; in particular it does not indicate `EOF`.
+     * considering the EOF. Doing so correctly handles I/O errors that happen
+     * after reading some bytes and also both of the allowed EOF behaviors.
      *
      * Implementations must not retain `p`.
      */
-    read(p: Uint8Array): Promise<ReadResult>;
+    read(p: Uint8Array): Promise<number | EOF>;
   }
   export interface SyncReader {
-    readSync(p: Uint8Array): ReadResult;
+    readSync(p: Uint8Array): number | EOF;
   }
   export interface Writer {
     /** Writes `p.byteLength` bytes from `p` to the underlying data
@@ -158,27 +152,27 @@ declare namespace Deno {
   export function open(filename: string, mode?: OpenMode): Promise<File>;
   /** Read synchronously from a file ID into an array buffer.
    *
-   * Return `ReadResult` for the operation.
+   * Return `number | EOF` for the operation.
    *
    *      const file = Deno.openSync("/foo/bar.txt");
    *      const buf = new Uint8Array(100);
-   *      const { nread, eof } = Deno.readSync(file.rid, buf);
+   *      const nread = Deno.readSync(file.rid, buf);
    *      const text = new TextDecoder().decode(buf);
    *
    */
-  export function readSync(rid: number, p: Uint8Array): ReadResult;
+  export function readSync(rid: number, p: Uint8Array): number | EOF;
   /** Read from a file ID into an array buffer.
    *
-   * Resolves with the `ReadResult` for the operation.
+   * Resolves with the `number | EOF` for the operation.
    *
    *       (async () => {
    *         const file = await Deno.open("/foo/bar.txt");
    *         const buf = new Uint8Array(100);
-   *         const { nread, eof } = await Deno.read(file.rid, buf);
+   *         const nread = await Deno.read(file.rid, buf);
    *         const text = new TextDecoder().decode(buf);
    *       })();
    */
-  export function read(rid: number, p: Uint8Array): Promise<ReadResult>;
+  export function read(rid: number, p: Uint8Array): Promise<number | EOF>;
   /** Write synchronously to the file ID the contents of the array buffer.
    *
    * Resolves with the number of bytes written.
@@ -236,8 +230,8 @@ declare namespace Deno {
     constructor(rid: number);
     write(p: Uint8Array): Promise<number>;
     writeSync(p: Uint8Array): number;
-    read(p: Uint8Array): Promise<ReadResult>;
-    readSync(p: Uint8Array): ReadResult;
+    read(p: Uint8Array): Promise<number | EOF>;
+    readSync(p: Uint8Array): number | EOF;
     seek(offset: number, whence: SeekMode): Promise<void>;
     seekSync(offset: number, whence: SeekMode): void;
     close(): void;
@@ -323,8 +317,8 @@ declare namespace Deno {
      * is drained. The return value n is the number of bytes read. If the
      * buffer has no data to return, eof in the response will be true.
      */
-    readSync(p: Uint8Array): ReadResult;
-    read(p: Uint8Array): Promise<ReadResult>;
+    readSync(p: Uint8Array): number | EOF;
+    read(p: Uint8Array): Promise<number | EOF>;
     writeSync(p: Uint8Array): number;
     write(p: Uint8Array): Promise<number>;
     /** _grow() grows the buffer to guarantee space for n more bytes.
@@ -417,6 +411,42 @@ declare namespace Deno {
    *       await Deno.chmod("/path/to/file", 0o666);
    */
   export function chmod(path: string, mode: number): Promise<void>;
+  /**
+   * Change owner of a regular file or directory synchronously. Unix only at the moment.
+   * @param path path to the file
+   * @param uid user id of the new owner
+   * @param gid group id of the new owner
+   */
+  export function chownSync(path: string, uid: number, gid: number): void;
+  /**
+   * Change owner of a regular file or directory asynchronously. Unix only at the moment.
+   * @param path path to the file
+   * @param uid user id of the new owner
+   * @param gid group id of the new owner
+   */
+  export function chown(path: string, uid: number, gid: number): Promise<void>;
+  /** Synchronously changes the access and modification times of a file system
+   * object referenced by `filename`. Given times are either in seconds
+   * (Unix epoch time) or as `Date` objects.
+   *
+   *       Deno.utimeSync("myfile.txt", 1556495550, new Date());
+   */
+  export function utimeSync(
+    filename: string,
+    atime: number | Date,
+    mtime: number | Date
+  ): void;
+  /** Changes the access and modification times of a file system object
+   * referenced by `filename`. Given times are either in seconds
+   * (Unix epoch time) or as `Date` objects.
+   *
+   *       await Deno.utime("myfile.txt", 1556495550, new Date());
+   */
+  export function utime(
+    filename: string,
+    atime: number | Date,
+    mtime: number | Date
+  ): Promise<void>;
   export interface RemoveOption {
     recursive?: boolean;
   }
@@ -490,10 +520,8 @@ declare namespace Deno {
      * for this file/directory. TODO Match behavior with Go on windows for mode.
      */
     mode: number | null;
-    /** Returns the file or directory name. */
+    /** The file or directory name. */
     name: string | null;
-    /** Returns the file or directory path. */
-    path: string | null;
     /** Returns whether this is info for a regular file. This result is mutually
      * exclusive to `FileInfo.isDirectory` and `FileInfo.isSymlink`.
      */
@@ -682,9 +710,15 @@ declare namespace Deno {
     TooLarge = 36,
     InvalidUri = 37,
     InvalidSeekMode = 38,
-    OpNotAvaiable = 39,
+    OpNotAvailable = 39,
     WorkerInitFailed = 40,
-    UnixError = 41
+    UnixError = 41,
+    NoAsyncSupport = 42,
+    NoSyncSupport = 43,
+    ImportMapError = 44,
+    ImportPathPrefixMissing = 45,
+    Diagnostic = 46,
+    JSError = 47
   }
   /** A Deno specific error.  The `kind` property is set to a specific error code
    * which can be used to in application logic.
@@ -712,7 +746,7 @@ declare namespace Deno {
     net: boolean;
     env: boolean;
     run: boolean;
-    highPrecision: boolean;
+    hrtime: boolean;
   }
   export type Permission = keyof Permissions;
   /** Inspect granted permissions for the current program.
@@ -748,7 +782,7 @@ declare namespace Deno {
   type Network = "tcp";
   type Addr = string;
   /** A Listener is a generic network listener for stream-oriented protocols. */
-  export interface Listener {
+  export interface Listener extends AsyncIterator<Conn> {
     /** Waits for and resolves to the next connection to the `Listener`. */
     accept(): Promise<Conn>;
     /** Close closes the listener. Any pending accept promises will be rejected
@@ -757,6 +791,7 @@ declare namespace Deno {
     close(): void;
     /** Return the address of the `Listener`. */
     addr(): Addr;
+    [Symbol.asyncIterator](): AsyncIterator<Conn>;
   }
   export interface Conn extends Reader, Writer, Closer {
     /** The local address of the connection. */
@@ -866,9 +901,9 @@ declare namespace Deno {
     env?: {
       [key: string]: string;
     };
-    stdout?: ProcessStdio;
-    stderr?: ProcessStdio;
-    stdin?: ProcessStdio;
+    stdout?: ProcessStdio | number;
+    stderr?: ProcessStdio | number;
+    stdin?: ProcessStdio | number;
   }
   /** Send a signal to process under given PID. Unix only at this moment.
    * If pid is negative, the signal will be sent to the process group identified
@@ -910,7 +945,8 @@ declare namespace Deno {
    * mapping.
    *
    * By default subprocess inherits stdio of parent process. To change that
-   * `opt.stdout`, `opt.stderr` and `opt.stdin` can be specified independently.
+   * `opt.stdout`, `opt.stderr` and `opt.stdin` can be specified independently -
+   * they can be set to either `ProcessStdio` or `rid` of open file.
    */
   export function run(opt: RunOptions): Process;
   enum LinuxSignal {
@@ -1072,18 +1108,20 @@ declare interface Window {
   atob: typeof textEncoding.atob;
   btoa: typeof textEncoding.btoa;
   fetch: typeof fetchTypes.fetch;
-  clearTimeout: typeof timers.clearTimer;
-  clearInterval: typeof timers.clearTimer;
+  clearTimeout: typeof timers.clearTimeout;
+  clearInterval: typeof timers.clearInterval;
   console: consoleTypes.Console;
   setTimeout: typeof timers.setTimeout;
   setInterval: typeof timers.setInterval;
   location: domTypes.Location;
+  crypto: Crypto;
   Blob: typeof blob.DenoBlob;
   File: domTypes.DomFileConstructor;
   CustomEventInit: typeof customEvent.CustomEventInit;
   CustomEvent: typeof customEvent.CustomEvent;
   EventInit: typeof event.EventInit;
   Event: typeof event.Event;
+  EventListener: typeof eventTarget.EventListener;
   EventTarget: typeof eventTarget.EventTarget;
   URL: typeof url.URL;
   URLSearchParams: typeof urlSearchParams.URLSearchParams;
@@ -1091,6 +1129,8 @@ declare interface Window {
   FormData: domTypes.FormDataConstructor;
   TextEncoder: typeof textEncoding.TextEncoder;
   TextDecoder: typeof textEncoding.TextDecoder;
+  Request: domTypes.RequestConstructor;
+  Response: typeof fetchTypes.Response;
   performance: performanceUtil.Performance;
   onmessage: (e: { data: any }) => void;
   workerMain: typeof workers.workerMain;
@@ -1101,22 +1141,23 @@ declare interface Window {
 }
 
 declare const window: Window;
-declare const globalThis: Window;
 declare const atob: typeof textEncoding.atob;
 declare const btoa: typeof textEncoding.btoa;
 declare const fetch: typeof fetchTypes.fetch;
-declare const clearTimeout: typeof timers.clearTimer;
-declare const clearInterval: typeof timers.clearTimer;
+declare const clearTimeout: typeof timers.clearTimeout;
+declare const clearInterval: typeof timers.clearInterval;
 declare const console: consoleTypes.Console;
 declare const setTimeout: typeof timers.setTimeout;
 declare const setInterval: typeof timers.setInterval;
 declare const location: domTypes.Location;
+declare const crypto: Crypto;
 declare const Blob: typeof blob.DenoBlob;
 declare const File: domTypes.DomFileConstructor;
 declare const CustomEventInit: typeof customEvent.CustomEventInit;
 declare const CustomEvent: typeof customEvent.CustomEvent;
 declare const EventInit: typeof event.EventInit;
 declare const Event: typeof event.Event;
+declare const EventListener: typeof eventTarget.EventListener;
 declare const EventTarget: typeof eventTarget.EventTarget;
 declare const URL: typeof url.URL;
 declare const URLSearchParams: typeof urlSearchParams.URLSearchParams;
@@ -1124,6 +1165,8 @@ declare const Headers: domTypes.HeadersConstructor;
 declare const FormData: domTypes.FormDataConstructor;
 declare const TextEncoder: typeof textEncoding.TextEncoder;
 declare const TextDecoder: typeof textEncoding.TextDecoder;
+declare const Request: domTypes.RequestConstructor;
+declare const Response: typeof fetchTypes.Response;
 declare const performance: performanceUtil.Performance;
 declare let onmessage: (e: { data: any }) => void;
 declare const workerMain: typeof workers.workerMain;
@@ -1137,6 +1180,7 @@ declare type CustomEventInit = customEvent.CustomEventInit;
 declare type CustomEvent = customEvent.CustomEvent;
 declare type EventInit = event.EventInit;
 declare type Event = event.Event;
+declare type EventListener = eventTarget.EventListener;
 declare type EventTarget = eventTarget.EventTarget;
 declare type URL = url.URL;
 declare type URLSearchParams = urlSearchParams.URLSearchParams;
@@ -1144,11 +1188,29 @@ declare type Headers = domTypes.Headers;
 declare type FormData = domTypes.FormData;
 declare type TextEncoder = textEncoding.TextEncoder;
 declare type TextDecoder = textEncoding.TextDecoder;
+declare type Request = domTypes.Request;
+declare type Response = domTypes.Response;
 declare type Worker = workers.Worker;
 
 declare interface ImportMeta {
   url: string;
   main: boolean;
+}
+
+declare interface Crypto {
+  readonly subtle: null;
+  getRandomValues: <
+    T extends
+      | Int8Array
+      | Uint8Array
+      | Uint8ClampedArray
+      | Int16Array
+      | Uint16Array
+      | Int32Array
+      | Uint32Array
+  >(
+    typedArray: T
+  ) => T;
 }
 
 declare namespace domTypes {
@@ -1178,9 +1240,6 @@ declare namespace domTypes {
     | "unsafe-url";
   export type BlobPart = BufferSource | Blob | string;
   export type FormDataEntryValue = DomFile | string;
-  export type EventListenerOrEventListenerObject =
-    | EventListener
-    | EventListenerObject;
   export interface DomIterable<K, V> {
     keys(): IterableIterator<K>;
     values(): IterableIterator<V>;
@@ -1199,16 +1258,25 @@ declare namespace domTypes {
   interface AbortSignalEventMap {
     abort: ProgressEvent;
   }
+  export enum NodeType {
+    ELEMENT_NODE = 1,
+    TEXT_NODE = 3,
+    DOCUMENT_FRAGMENT_NODE = 11
+  }
   export interface EventTarget {
+    host: EventTarget | null;
+    listeners: { [type in string]: EventListener[] };
+    mode: string;
+    nodeType: NodeType;
     addEventListener(
       type: string,
-      listener: EventListenerOrEventListenerObject | null,
+      callback: (event: Event) => void | null,
       options?: boolean | AddEventListenerOptions
     ): void;
-    dispatchEvent(evt: Event): boolean;
+    dispatchEvent(event: Event): boolean;
     removeEventListener(
       type: string,
-      listener?: EventListenerOrEventListenerObject | null,
+      callback?: (event: Event) => void | null,
       options?: EventListenerOptions | boolean
     ): void;
   }
@@ -1264,7 +1332,9 @@ declare namespace domTypes {
     ): void;
   }
   export interface EventListener {
-    (evt: Event): void;
+    handleEvent(event: Event): void;
+    readonly callback: (event: Event) => void | null;
+    readonly options: boolean | AddEventListenerOptions;
   }
   export interface EventInit {
     bubbles?: boolean;
@@ -1291,10 +1361,10 @@ declare namespace domTypes {
   }
   export interface Event {
     readonly type: string;
-    readonly target: EventTarget | null;
-    readonly currentTarget: EventTarget | null;
+    target: EventTarget | null;
+    currentTarget: EventTarget | null;
     composedPath(): EventPath[];
-    readonly eventPhase: number;
+    eventPhase: number;
     stopPropagation(): void;
     stopImmediatePropagation(): void;
     readonly bubbles: boolean;
@@ -1302,8 +1372,15 @@ declare namespace domTypes {
     preventDefault(): void;
     readonly defaultPrevented: boolean;
     readonly composed: boolean;
-    readonly isTrusted: boolean;
+    isTrusted: boolean;
     readonly timeStamp: Date;
+    dispatched: boolean;
+    readonly initialized: boolean;
+    inPassiveListener: boolean;
+    cancelBubble: boolean;
+    cancelBubbleImmediately: boolean;
+    path: EventPath[];
+    relatedTarget: EventTarget | null;
   }
   export interface CustomEvent extends Event {
     readonly detail: any;
@@ -1335,11 +1412,11 @@ declare namespace domTypes {
     readonly total: number;
   }
   export interface EventListenerOptions {
-    capture?: boolean;
+    capture: boolean;
   }
   export interface AddEventListenerOptions extends EventListenerOptions {
-    once?: boolean;
-    passive?: boolean;
+    once: boolean;
+    passive: boolean;
   }
   interface AbortSignal extends EventTarget {
     readonly aborted: boolean;
@@ -1351,7 +1428,7 @@ declare namespace domTypes {
     ): void;
     addEventListener(
       type: string,
-      listener: EventListenerOrEventListenerObject,
+      listener: EventListener,
       options?: boolean | AddEventListenerOptions
     ): void;
     removeEventListener<K extends keyof AbortSignalEventMap>(
@@ -1361,7 +1438,7 @@ declare namespace domTypes {
     ): void;
     removeEventListener(
       type: string,
-      listener: EventListenerOrEventListenerObject,
+      listener: EventListener,
       options?: boolean | EventListenerOptions
     ): void;
   }
@@ -1369,9 +1446,7 @@ declare namespace domTypes {
     readonly locked: boolean;
     cancel(): Promise<void>;
     getReader(): ReadableStreamReader;
-  }
-  export interface EventListenerObject {
-    handleEvent(evt: Event): void;
+    tee(): [ReadableStream, ReadableStream];
   }
   export interface ReadableStreamReader {
     cancel(): Promise<void>;
@@ -1532,21 +1607,25 @@ declare namespace domTypes {
     status?: number;
     statusText?: string;
   }
+  export interface RequestConstructor {
+    new (input: RequestInfo, init?: RequestInit): Request;
+    prototype: Request;
+  }
   export interface Request extends Body {
     /** Returns the cache mode associated with request, which is a string
      * indicating how the the request will interact with the browser's cache when
      * fetching.
      */
-    readonly cache: RequestCache;
+    readonly cache?: RequestCache;
     /** Returns the credentials mode associated with request, which is a string
      * indicating whether credentials will be sent with the request always, never,
      * or only when sent to a same-origin URL.
      */
-    readonly credentials: RequestCredentials;
+    readonly credentials?: RequestCredentials;
     /** Returns the kind of resource requested by request, (e.g., `document` or
      * `script`).
      */
-    readonly destination: RequestDestination;
+    readonly destination?: RequestDestination;
     /** Returns a Headers object consisting of the headers associated with
      * request.
      *
@@ -1558,32 +1637,32 @@ declare namespace domTypes {
      * hash of the resource being fetched. Its value consists of multiple hashes
      * separated by whitespace. [SRI]
      */
-    readonly integrity: string;
+    readonly integrity?: string;
     /** Returns a boolean indicating whether or not request is for a history
      * navigation (a.k.a. back-forward navigation).
      */
-    readonly isHistoryNavigation: boolean;
+    readonly isHistoryNavigation?: boolean;
     /** Returns a boolean indicating whether or not request is for a reload
      * navigation.
      */
-    readonly isReloadNavigation: boolean;
+    readonly isReloadNavigation?: boolean;
     /** Returns a boolean indicating whether or not request can outlive the global
      * in which it was created.
      */
-    readonly keepalive: boolean;
+    readonly keepalive?: boolean;
     /** Returns request's HTTP method, which is `GET` by default. */
     readonly method: string;
     /** Returns the mode associated with request, which is a string indicating
      * whether the request will use CORS, or will be restricted to same-origin
      * URLs.
      */
-    readonly mode: RequestMode;
+    readonly mode?: RequestMode;
     /** Returns the redirect mode associated with request, which is a string
      * indicating how redirects for the request will be handled during fetching.
      *
      * A request will follow redirects by default.
      */
-    readonly redirect: RequestRedirect;
+    readonly redirect?: RequestRedirect;
     /** Returns the referrer of request. Its value can be a same-origin URL if
      * explicitly set in init, the empty string to indicate no referrer, and
      * `about:client` when defaulting to the global's default.
@@ -1591,16 +1670,16 @@ declare namespace domTypes {
      * This is used during fetching to determine the value of the `Referer`
      * header of the request being made.
      */
-    readonly referrer: string;
+    readonly referrer?: string;
     /** Returns the referrer policy associated with request. This is used during
      * fetching to compute the value of the request's referrer.
      */
-    readonly referrerPolicy: ReferrerPolicy;
+    readonly referrerPolicy?: ReferrerPolicy;
     /** Returns the signal associated with request, which is an AbortSignal object
      * indicating whether or not request has been aborted, and its abort event
      * handler.
      */
-    readonly signal: AbortSignal;
+    readonly signal?: AbortSignal;
     /** Returns the URL of request as a string. */
     readonly url: string;
     clone(): Request;
@@ -1797,8 +1876,9 @@ declare namespace event {
     });
   }
   export class Event implements domTypes.Event {
+    isTrusted: boolean;
     private _canceledFlag;
-    private dispatchedFlag;
+    private _dispatchedFlag;
     private _initializedFlag;
     private _inPassiveListenerFlag;
     private _stopImmediatePropagationFlag;
@@ -1806,17 +1886,19 @@ declare namespace event {
     private _path;
     constructor(type: string, eventInitDict?: domTypes.EventInit);
     readonly bubbles: boolean;
-    readonly cancelBubble: boolean;
-    readonly cancelBubbleImmediately: boolean;
+    cancelBubble: boolean;
+    cancelBubbleImmediately: boolean;
     readonly cancelable: boolean;
     readonly composed: boolean;
-    readonly currentTarget: domTypes.EventTarget;
+    currentTarget: domTypes.EventTarget;
     readonly defaultPrevented: boolean;
-    readonly dispatched: boolean;
-    readonly eventPhase: number;
+    dispatched: boolean;
+    eventPhase: number;
     readonly initialized: boolean;
-    readonly isTrusted: boolean;
-    readonly target: domTypes.EventTarget;
+    inPassiveListener: boolean;
+    path: domTypes.EventPath[];
+    relatedTarget: domTypes.EventTarget;
+    target: domTypes.EventTarget;
     readonly timeStamp: Date;
     readonly type: string;
     /** Returns the event’s path (objects on which listeners will be
@@ -1874,30 +1956,93 @@ declare namespace customEvent {
 }
 
 declare namespace eventTarget {
+  export class EventListenerOptions implements domTypes.EventListenerOptions {
+    _capture: boolean;
+    constructor({ capture }?: { capture?: boolean | undefined });
+    readonly capture: boolean;
+  }
+  export class AddEventListenerOptions extends EventListenerOptions
+    implements domTypes.AddEventListenerOptions {
+    _passive: boolean;
+    _once: boolean;
+    constructor({
+      capture,
+      passive,
+      once
+    }?: {
+      capture?: boolean | undefined;
+      passive?: boolean | undefined;
+      once?: boolean | undefined;
+    });
+    readonly passive: boolean;
+    readonly once: boolean;
+  }
+  export class EventListener implements domTypes.EventListener {
+    allEvents: domTypes.Event[];
+    atEvents: domTypes.Event[];
+    bubbledEvents: domTypes.Event[];
+    capturedEvents: domTypes.Event[];
+    private _callback;
+    private _options;
+    constructor(
+      callback: (event: domTypes.Event) => void | null,
+      options: boolean | domTypes.AddEventListenerOptions
+    );
+    handleEvent(event: domTypes.Event): void;
+    readonly callback: (event: domTypes.Event) => void | null;
+    readonly options: domTypes.AddEventListenerOptions | boolean;
+  }
   export class EventTarget implements domTypes.EventTarget {
-    listeners: {
-      [type in string]: domTypes.EventListenerOrEventListenerObject[]
-    };
+    host: domTypes.EventTarget | null;
+    listeners: { [type in string]: domTypes.EventListener[] };
+    mode: string;
+    nodeType: domTypes.NodeType;
+    private _assignedSlot;
+    private _hasActivationBehavior;
     addEventListener(
       type: string,
-      listener: domTypes.EventListenerOrEventListenerObject | null,
-      _options?: boolean | domTypes.AddEventListenerOptions
+      callback: (event: domTypes.Event) => void | null,
+      options?: domTypes.AddEventListenerOptions | boolean
     ): void;
     removeEventListener(
       type: string,
-      callback: domTypes.EventListenerOrEventListenerObject | null,
-      _options?: domTypes.EventListenerOptions | boolean
+      callback: (event: domTypes.Event) => void | null,
+      options?: domTypes.EventListenerOptions | boolean
     ): void;
     dispatchEvent(event: domTypes.Event): boolean;
+    _dispatch(
+      eventImpl: domTypes.Event,
+      targetOverride?: domTypes.EventTarget
+    ): boolean;
+    _invokeEventListeners(
+      tuple: domTypes.EventPath,
+      eventImpl: domTypes.Event
+    ): void;
+    _innerInvokeEventListeners(
+      eventImpl: domTypes.Event,
+      targetListeners: { [type in string]: domTypes.EventListener[] }
+    ): boolean;
+    _normalizeAddEventHandlerOptions(
+      options: boolean | domTypes.AddEventListenerOptions | undefined
+    ): domTypes.AddEventListenerOptions;
+    _normalizeEventHandlerOptions(
+      options: boolean | domTypes.EventListenerOptions | undefined
+    ): domTypes.EventListenerOptions;
+    _appendToEventPath(
+      eventImpl: domTypes.Event,
+      target: domTypes.EventTarget,
+      targetOverride: domTypes.EventTarget | null,
+      relatedTarget: domTypes.EventTarget | null,
+      touchTargets: domTypes.EventTarget[],
+      slotInClosedTree: boolean
+    ): void;
     readonly [Symbol.toStringTag]: string;
   }
 }
 
 declare namespace io {
-  export interface ReadResult {
-    nread: number;
-    eof: boolean;
-  }
+  export const EOF: null;
+  export type EOF = null;
   export enum SeekMode {
     SEEK_START = 0,
     SEEK_CURRENT = 1,
@@ -1905,35 +2050,26 @@ declare namespace io {
   }
   export interface Reader {
     /** Reads up to p.byteLength bytes into `p`. It resolves to the number
-     * of bytes read (`0` <= `n` <= `p.byteLength`) and any error encountered.
+     * of bytes read (`0` < `n` <= `p.byteLength`) and rejects if any error encountered.
      * Even if `read()` returns `n` < `p.byteLength`, it may use all of `p` as
      * scratch space during the call. If some data is available but not
      * `p.byteLength` bytes, `read()` conventionally returns what is available
      * instead of waiting for more.
      *
-     * When `read()` encounters an error or end-of-file condition after
-     * successfully reading `n` > `0` bytes, it returns the number of bytes read.
-     * It may return the (non-nil) error from the same call or return the error
-     * (and `n` == `0`) from a subsequent call. An instance of this general case
-     * is that a `Reader` returning a non-zero number of bytes at the end of the
-     * input stream may return either `err` == `EOF` or `err` == `null`. The next
-     * `read()` should return `0`, `EOF`.
+     * When `read()` encounters end-of-file condition, it returns EOF symbol.
+     *
+     * When `read()` encounters an error, it rejects with an error.
      *
      * Callers should always process the `n` > `0` bytes returned before
-     * considering the `EOF`. Doing so correctly handles I/O errors that happen
-     * after reading some bytes and also both of the allowed `EOF` behaviors.
-     *
-     * Implementations of `read()` are discouraged from returning a zero byte
-     * count with a `null` error, except when `p.byteLength` == `0`. Callers
-     * should treat a return of `0` and `null` as indicating that nothing
-     * happened; in particular it does not indicate `EOF`.
+     * considering the EOF. Doing so correctly handles I/O errors that happen
+     * after reading some bytes and also both of the allowed EOF behaviors.
      *
      * Implementations must not retain `p`.
      */
-    read(p: Uint8Array): Promise<ReadResult>;
+    read(p: Uint8Array): Promise<number | EOF>;
   }
   export interface SyncReader {
-    readSync(p: Uint8Array): ReadResult;
+    readSync(p: Uint8Array): number | EOF;
   }
   export interface Writer {
     /** Writes `p.byteLength` bytes from `p` to the underlying data
@@ -2007,17 +2143,19 @@ declare namespace fetchTypes {
     formData(): Promise<domTypes.FormData>;
     json(): Promise<any>;
     text(): Promise<string>;
-    read(p: Uint8Array): Promise<io.ReadResult>;
+    read(p: Uint8Array): Promise<number | io.EOF>;
     close(): void;
     cancel(): Promise<void>;
     getReader(): domTypes.ReadableStreamReader;
+    tee(): [domTypes.ReadableStream, domTypes.ReadableStream];
+    [Symbol.asyncIterator](): AsyncIterableIterator<Uint8Array>;
   }
-  class Response implements domTypes.Response {
+  export class Response implements domTypes.Response {
     readonly status: number;
     readonly url: string;
     statusText: string;
     readonly type = "basic";
-    redirected: boolean;
+    readonly redirected: boolean;
     headers: domTypes.Headers;
     readonly trailer: Promise<domTypes.Headers>;
     bodyUsed: boolean;
@@ -2026,6 +2164,7 @@ declare namespace fetchTypes {
       status: number,
       headersList: Array<[string, string]>,
       rid: number,
+      redirected_: boolean,
       body_?: null | Body
     );
     arrayBuffer(): Promise<ArrayBuffer>;
@@ -2067,11 +2206,16 @@ declare namespace textEncoding {
     decode(input?: domTypes.BufferSource, options?: TextDecodeOptions): string;
     readonly [Symbol.toStringTag]: string;
   }
+  interface TextEncoderEncodeIntoResult {
+    read: number;
+    written: number;
+  }
   export class TextEncoder {
     /** Returns "utf-8". */
     readonly encoding = "utf-8";
     /** Returns the result of running UTF-8's encoder. */
     encode(input?: string): Uint8Array;
+    encodeInto(input: string, dest: Uint8Array): TextEncoderEncodeIntoResult;
     readonly [Symbol.toStringTag]: string;
   }
 }
@@ -2090,14 +2234,16 @@ declare namespace timers {
     delay: number,
     ...args: Args
   ): number;
-  /** Clears a previously set timer by id. AKA clearTimeout and clearInterval. */
-  export function clearTimer(id: number): void;
+  export function clearTimeout(id: number): void;
+  export function clearInterval(id: number): void;
 }
 
 declare namespace urlSearchParams {
   export class URLSearchParams {
     private params;
+    private url;
     constructor(init?: string | string[][] | Record<string, string>);
+    private updateSteps;
     /** Appends a specified key/value pair as a new search parameter.
      *
      *       searchParams.append('name', 'first');
@@ -2252,9 +2398,9 @@ declare namespace workers {
 
 declare namespace performanceUtil {
   export class Performance {
-    /** Returns a current time from Deno's start.
-     *  In milliseconds. Flag --allow-high-precision give
-     *  a precise measure.
+    /** Returns a current time from Deno's start in milliseconds.
+     *
+     * Use the flag --allow-hrtime return a precise value.
      *
      *       const t = performance.now();
      *       console.log(`${t} ms since start!`);

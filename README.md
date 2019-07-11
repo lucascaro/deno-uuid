@@ -1,6 +1,11 @@
 # Deno UUID
 
-UUID library for [Deno](https://deno.land).
+UUID ~~library~~ generator with [Deno](https://deno.land).
+
+**Warning: the library code of this module has been moved to `https://deno.land/std/testing/mod.ts`.**
+
+**You can use this module to generate UUIDs in the command line, but you should**
+**use `deno_std` as your uuid library.**
 
 ## Usage
 
@@ -12,9 +17,10 @@ Using deno:
 
 ```bash
 
-$ deno https://deno.land/x/uuid/genuuid.ts
-Downloading https://deno.land/x/uuid/generate.ts...
-Downloading https://deno.land/x/uuid/mod.ts...
+$ deno run https://deno.land/x/uuid/genuuid.ts
+Compile file:///Users/lucascaro/checkout/deno/deno-uuid/genuuid.ts
+Download https://deno.land/std/uuid/mod.ts
+Download https://deno.land/std/uuid/v4.ts
 ca137e5f-575e-4810-8229-80b6468c54fb
 
 $ deno https://deno.land/x/uuid/genuuid.ts 3
@@ -37,12 +43,6 @@ $ genuuid
 
 ### Library
 
-For use in other packages, simply import the function:
-
-```js
-import { uuid } from "https://deno.land/x/uuid/mod.ts";
-
-const myUUID = uuid();
-```
+For use as a library, refer to `https://deno.land/std/testing/mod.ts`:
 
 LICENSE: MIT

@@ -9,7 +9,7 @@
  * where N is an optional number of uuids to generate (defaults to 1).
  */
 
-import { uuid } from "./mod.ts";
+import uuid from "https://deno.land/std/uuid/mod.ts";;
 
 const { args } = Deno;
 
