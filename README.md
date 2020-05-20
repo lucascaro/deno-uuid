@@ -2,7 +2,7 @@
 
 UUID ~~library~~ generator with [Deno](https://deno.land).
 
-**Warning: the library code of this module has been moved to `https://deno.land/std/testing/mod.ts`.**
+**Warning: the library code of this module has been moved to `https://deno.land/std/uuid/mod.ts`.**
 
 **You can use this module to generate UUIDs in the command line, but you should**
 **use `deno_std` as your uuid library.**
@@ -43,6 +43,6 @@ $ genuuid
 
 ### Library
 
-For use as a library, refer to `https://deno.land/std/testing/mod.ts`:
+For use as a library, refer to `https://deno.land/std/uuid/mod.ts`:
 
 LICENSE: MIT
