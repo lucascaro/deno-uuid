@@ -9,7 +9,7 @@
  * where N is an optional number of uuids to generate (defaults to 1).
  */
 
-import * as uuid from "https://deno.land/std/uuid/mod.ts";;
+import { v4 } from "https://deno.land/std/uuid/mod.ts";
 
 const { args } = Deno;
 
@@ -25,5 +25,5 @@ if (Number.isNaN(n)) {
 Array(n)
   .fill(0)
   .forEach(() => {
-    console.log(uuid());
+    console.log(v4.generate());
   });
