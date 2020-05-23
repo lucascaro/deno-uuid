@@ -1,7 +1,3 @@
-# Warning: This module is now part of the deno standard library:
-https://deno.land/std/uuid
-
-
 # Deno UUID
 
 UUID ~~library~~ generator with [Deno](https://deno.land).
